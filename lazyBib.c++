@@ -16,8 +16,7 @@ void cleanString(std::string &str, std::vector<char> charToClean);
 class Citation
 {
 	public :
-		Citation(std::string const& outputBib);
-		Citation(std::string const& outputBib, std::string const& citePattern);
+		Citation(std::string const& outputBib, std::vector<std::string> const& citePattern);
 		void run(std::string nameFile);
 		friend std::ostream& operator<<(std::ostream& os, Citation const& cite);
 
@@ -26,11 +25,10 @@ class Citation
 		std::map<std::string, std::map<std::string, int> > m_listRef; // map2d m_listRef; // map <string nameRef, map <string fromFile, int count> >
 		std::string m_outputBib;
 		bool m_firstCall;
-		bool m_biblatex;
-		std::string const m_citePattern;
+		std::vector<std::string> const m_citePattern;
 
 	// member functions
-		void makeList(string nameFile, string const fromFile);
+		void makeList(string nameFile, string const citePattern, string const fromFile);
 		bool splitComa(std::string const &str, std::string const &fromFile);
 		bool bibFile(string const nameLibrary, std::ios::openmode mode = std::ios::out);
 		void addRef(std::string const nameRef, std::string const fromFile);
@@ -38,18 +36,13 @@ class Citation
 
 
 
-Citation::Citation(std::string const& outputBib) :
-m_outputBib(outputBib), m_firstCall(true), m_citePattern("\\cite"), m_biblatex(false)
-{
-	std::cout << "Default citePattern: <" << m_citePattern << ">" << std::endl;
-}
-
-
-
-Citation::Citation(std::string const& outputBib, std::string const& citePattern) :
+Citation::Citation(std::string const& outputBib, std::vector<std::string> const& citePattern) :
 m_outputBib(outputBib), m_firstCall(true), m_citePattern(citePattern)
 {
-
+	std::vector<std::string>::const_iterator it = m_citePattern.cbegin();
+	std::cout << "Using the following citing patterns:" << std::endl;
+	for (; it != m_citePattern.cend(); ++it)
+		std::cout << "<" << *it << ">" << std::endl;
 }
 
 
@@ -96,7 +89,7 @@ void Citation::addRef(std::string const nameRef, std::string const fromFile)
 
 
 
-void Citation::makeList(string nameFile, string const fromFile)
+void Citation::makeList(string nameFile, string const citePattern, string const fromFile)
 {
 	std::vector<char> vecChar(1,'"');
 	cleanString(nameFile, vecChar);
@@ -127,7 +120,7 @@ void Citation::makeList(string nameFile, string const fromFile)
 
 	while ((getline(ifs, readingLine)) && !(ifs.eof()))
 	{
-		while ((readingLine[0] == '%') && !(ifs.eof())) // to drop all of comment lines
+		while ((readingLine[0] == '%') && !(ifs.eof())) // to drop all comment lines
 			getline(ifs, readingLine);
 
 		while ( (inputPos = readingLine.find("input{", inputPos)) != string::npos) // recursive call
@@ -135,10 +128,10 @@ void Citation::makeList(string nameFile, string const fromFile)
 			inputPos += 6;
 			length_sub_str = readingLine.find("}", inputPos) - inputPos;
 			nameFile_recursiveCalling = readingLine.substr(inputPos, length_sub_str);
-			this->makeList(nameFile_recursiveCalling, nameFile);
+			this->makeList(nameFile_recursiveCalling, citePattern, nameFile);
 		}
 
-		while ( (citePos = readingLine.find(m_citePattern, citePos)) != string::npos) // Searches the string for the first occurrence of the sequence specified by its arguments.
+		while ( (citePos = readingLine.find(citePattern, citePos)) != string::npos) // Searches the string for the first occurrence of the sequence specified by its arguments.
 		{
 			citePos_sqBracket_opening = readingLine.find("[", citePos);
 			citePos_sqBracket_closing = readingLine.find("]", citePos);
@@ -219,9 +212,11 @@ void cleanString(std::string &str, std::vector<char> charToClean)
 void Citation::run(std::string nameFile)
 {
 	bool success = false;
+	std::vector<std::string>::const_iterator citePattern_it = m_citePattern.cbegin();
 	try
 	{
-		this->makeList(nameFile, nameFile);
+		for (; citePattern_it != m_citePattern.cend(); ++citePattern_it)
+			this->makeList(nameFile, *citePattern_it, nameFile);
 		cout << *this << endl;
 	}
 	catch (const string& strErrMakeList)
@@ -300,28 +295,28 @@ int main(int argc, char *argv[])
 {
 	try
 	{
-		if (argc != 3 && argc != 4)
-			throw string("*** ERROR (from main) : *** 2 (3) args are required \n ./exe main.tex output.bib (citePattern)");
+		if (argc < 3)
+			throw string("*** ERROR (from main) : *** 2 args are required (+ optional) \n ./exe main.tex output.bib (citePattern1 citePattern2 ... citePatternZ)");
+
 
 		std::map<string, string> listRef;
-		cout << "you are running " << argv[0] << " with arg = " << argv[1] << " and " << argv[2];
-		if (argc == 3)
-			cout << "you are running " << argv[0] << " with arg = " << argv[1] << " and " << argv[2] << endl;
-		else
-			cout << "you are running " << argv[0] << " with arg = " << argv[1] << ", " << argv[2] << " and " << argv[3] << endl;
+		cout << "you are running " << argv[0] << " with input latex file = " << argv[1] << " and output bibliography file " << argv[2] << endl;
 		try
 		{
+			std::vector<std::string> citingArgs;
 			if (argc == 3)
 			{
-				Citation cite(argv[2]);
-				cite.run(argv[1]);
+				std::cout << "Using the default citing pattern: \\cite" << std::endl;
+				citingArgs.push_back("\\cite");
 			}
 
-			if (argc == 4)
+			if (argc > 3)
 			{
-				Citation cite(argv[2], argv[3]);
-				cite.run(argv[1]);
+				for (unsigned int i = 3; i < argc; ++i)
+					citingArgs.push_back(argv[i]);
 			}
+			Citation cite(argv[2], citingArgs);
+			cite.run(argv[1]);
 		}
 		catch (const string& strErrCitation)
 		{
