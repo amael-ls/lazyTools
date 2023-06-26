@@ -79,7 +79,7 @@ for doi in info_dc:
 	
 	authors = metadata_article['author']
 	author_1 = authors[0]['family'].replace(" ", "").lower().capitalize()
-	year = metadata_article['issued']['date-parts'][0][0]
+	year = metadata_article['published-print']['date-parts'][0][0]
 	citation_key = author_1 + "." + str(year)
 	
 	entry = "author = {"
