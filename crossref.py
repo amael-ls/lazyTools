@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 from crossref.restful import Works
 import shutil
 import sys
