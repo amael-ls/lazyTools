@@ -1,10 +1,25 @@
 #!/usr/bin/python3
 
+import progressbar
 from crossref.restful import Works
 import shutil
 import sys
 import re
 
+#### Tool function
+## Function to count lines in a file
+def buf_count_newlines_gen(fname):
+	def _make_gen(reader):
+		while True:
+			b = reader(2 ** 16)
+			if not b: break
+			yield b
+
+	with open(fname, "rb") as f:
+		count = sum(buf.count(b"\n") for buf in _make_gen(f.raw.read))
+	return count
+
+#### Get arguments and copy files
 print("You are running the script", sys.argv[0])
 filename = sys.argv[1]
 ind = filename.index(".bib")
@@ -21,6 +36,10 @@ print("Its content has been copied into file", filename_orig)
 
 shutil.copy2(filename, filename_orig)
 
+#### Run program
+## Get number of lines in file
+max_count = buf_count_newlines_gen(filename) + 1
+
 #& Read file line by line, and store the lines to modify
 with open(filename, encoding = "utf8", mode = "r") as bibFile:
 	line = bibFile.readline()
@@ -36,7 +55,7 @@ with open(filename, encoding = "utf8", mode = "r") as bibFile:
 			flag_read_authors = False
 			flag_read_doi = False
 			flag_read_year = False
-			while line != "}\n":
+			while line != "}\n": # If the file ends by '}' without newline '\n', then max_count should be able to break the infinite loop
 				if ("author = {" in line) and flag_read_authors:
 					print("Corrupted bib file, there is more than one author field within an article")
 					break
@@ -60,18 +79,25 @@ with open(filename, encoding = "utf8", mode = "r") as bibFile:
 				
 				line = bibFile.readline()
 				counter += 1
+				if counter > max_count:
+					break
 			#? ------ Ending an article entry in bibliography
-			if flag_read_doi:
+			if flag_read_doi and flag_read_authors and flag_read_year:
 				info_dc.update({doi.group(1): art_auth_yr}) # Updating the dictionary doi: (article, author, year) lines
+			elif not flag_read_doi:
+				print("DOI is missing for:", art_auth_yr)
+			else :
+				print("Incomplete informations for doi:", doi.group(1))
 		line = bibFile.readline()
 		counter += 1
 
 #& Read entire file
 with open(filename, encoding = "utf8", mode = "r") as bibFile:
 	wholeFile = bibFile.readlines()
-
+  
 #& Modify the citation keys, authors, and years lines
-for doi in info_dc:
+for doi in progressbar.progressbar(info_dc):
+	error_metadata = False
 	metadata_article = Works().doi(doi)
 	if metadata_article is None:
 		print("No information found for doi", doi)
@@ -79,12 +105,35 @@ for doi in info_dc:
 	
 	authors = metadata_article['author']
 	author_1 = authors[0]['family'].replace(" ", "").lower().capitalize()
-	year = metadata_article['published-print']['date-parts'][0][0]
+	year = -9999
+	flag_read_year = False
+	if 'published-print' in metadata_article.keys():
+		flag_read_year = True
+		year = metadata_article['published-print']['date-parts'][0][0]
+	
+	elif 'published' in metadata_article.keys():
+		flag_read_year = True
+		year = metadata_article['published']['date-parts'][0][0]
+
+	else :
+		print("No key found to extract the year of publication! Here are all the keys of metadata_article:")
+		print(metadata_article.keys())
+
+	if not flag_read_year:
+		print("Warning: the year is probably wrong for doi", doi)
+
 	citation_key = author_1 + "." + str(year)
 	
 	entry = "author = {"
 	for author in authors:
-		entry += author['family'] + ", " + author['given'] + " and "
+		if 'family' not in author.keys() or 'given' not in author.keys():
+			print("The entries for doi", doi, "have not been modified because the metadata lack informations on authors' name")
+			error_metadata = True
+		else :
+			entry += author['family'] + ", " + author['given'] + " and "
+	
+	if error_metadata:
+		continue
 	entry = entry.rsplit(" and ", 1)[0] # Remove the last " and "
 	entry += "}, \n"
 
