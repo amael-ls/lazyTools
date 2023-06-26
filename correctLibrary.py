@@ -10,6 +10,12 @@ filename = sys.argv[1]
 ind = filename.index(".bib")
 filename_orig = filename[:ind] + "_orig" + filename[ind:]
 
+otherSave = False
+
+if len(sys.argv):
+	print("Output also saved under the name", sys.argv[2])
+	otherSave = True
+
 print("Modifying file", filename)
 print("Its content has been copied into file", filename_orig)
 
@@ -94,3 +100,7 @@ for doi in info_dc:
 #& Write into new file
 with open(filename, encoding = "utf8", mode = "w") as bibFile:
 	bibFile.writelines(wholeFile)
+
+if otherSave:
+	with open(sys.argv[2], encoding = "utf8", mode = "w") as bibFile:
+		bibFile.writelines(wholeFile)
