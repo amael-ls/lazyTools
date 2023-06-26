@@ -1,10 +1,20 @@
 from crossref.restful import Works
+import shutil
+import sys
 import re
 
-works = Works()
+print("You are running the script", sys.argv[0])
+filename = sys.argv[1]
+ind = filename.index(".bib")
+filename_orig = filename[:ind] + "_orig" + filename[ind:]
+
+print("Modifying file", filename)
+print("Its content has been copied into file", filename_orig)
+
+shutil.copy2(filename, filename_orig)
 
 #& Read file line by line, and store the lines to modify
-with open('article.bib', encoding = "utf8", mode = "r") as bibFile:
+with open(filename, encoding = "utf8", mode = "r") as bibFile:
 	line = bibFile.readline()
 	info_dc = dict()
 	author_counter = -1
@@ -43,19 +53,20 @@ with open('article.bib', encoding = "utf8", mode = "r") as bibFile:
 				line = bibFile.readline()
 				counter += 1
 			#? ------ Ending an article entry in bibliography
-			info_dc.update({doi.group(1): art_auth_yr}) # Updating the dictionary doi: (article, author, year) lines
+			if flag_read_doi:
+				info_dc.update({doi.group(1): art_auth_yr}) # Updating the dictionary doi: (article, author, year) lines
 		line = bibFile.readline()
 		counter += 1
 
 #& Read entire file
-with open('article.bib', encoding = "utf8", mode = "r") as bibFile:
+with open(filename, encoding = "utf8", mode = "r") as bibFile:
 	wholeFile = bibFile.readlines()
 
-#& Modify the authors lines
+#& Modify the citation keys, authors, and years lines
 for doi in info_dc:
-	metadata_article = works.doi(doi)
+	metadata_article = Works().doi(doi)
 	if metadata_article is None:
-		print("No information found for authors line", key_lineno, "with doi", doi)
+		print("No information found for doi", doi)
 		continue
 	
 	authors = metadata_article['author']
@@ -79,8 +90,5 @@ for doi in info_dc:
 	wholeFile[year_line] = "year = {" + str(year) + "}, \n"
 
 #& Write into new file
-with open('article_new.bib', encoding = "utf8", mode = "w") as bibFile:
+with open(filename, encoding = "utf8", mode = "w") as bibFile:
 	bibFile.writelines(wholeFile)
-
-
-metadata_article.keys()
