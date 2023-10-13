@@ -94,7 +94,7 @@ with open(filename, encoding = "utf8", mode = "r") as bibFile:
 #& Read entire file
 with open(filename, encoding = "utf8", mode = "r") as bibFile:
 	wholeFile = bibFile.readlines()
-  
+
 #& Modify the citation keys, authors, and years lines
 for doi in progressbar.progressbar(info_dc):
 	error_metadata = False
